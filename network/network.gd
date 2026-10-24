@@ -1,21 +1,17 @@
 class_name Network
 extends Node
 
+## Network Node -
+##
 ## Starts the ENet server or client and logs the connection events.
 
-## UDP port the server listen.
 const PORT := 7000
-
-## Default IPv4 localhost.
 const DEFAULT_SERVER_IP := "127.0.0.1"
-
-## Maximum number of clients connected at the same time.
 const MAX_CONNECTIONS := 20
 
 ## Version of the game sent to the server
 var game_version := ""
 
-# Node.multiplayer is typed MultiplayerAPI
 @onready var scene_multiplayer: SceneMultiplayer = multiplayer
 
 
@@ -29,9 +25,9 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(_on_connected_fail)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 
-	# A valid callback turns the authentication on, on both sides.
+	# A valid callback turns the authentication on.
 	# without it, peer_authenticating is never emitted and peers are accepted at once.
-	scene_multiplayer.auth_callback = _receive_auth_data
+	scene_multiplayer.auth_callback = _receive_auth_payload
 	scene_multiplayer.peer_authenticating.connect(_on_peer_authenticating)
 	scene_multiplayer.peer_authentication_failed.connect(
 			_on_peer_authentication_failed
@@ -73,11 +69,57 @@ func start_server() -> Error:
 
 #region ─────────────────────────────── AUTHENTICATION ─────────────────────────────────
 
-## Called by SceneMultiplayer with the authentication data sent by a peer.
-func _receive_auth_data(id: int, data: PackedByteArray) -> void:
-	print("Authentication data from peer %d: %s" % [id, data.get_string_from_utf8()])
-	
-	
+## Called by SceneMultiplayer with the authentication payload sent by a peer.
+func _receive_auth_payload(id: int, payload: PackedByteArray) -> void:
+	if multiplayer.is_server():
+		_check_client_version(id, payload)
+		return
+
+	print("Answer from the server: %s" % payload.get_string_from_utf8())
+
+
+## Answers the client, then admits it only if both versions match.
+func _check_client_version(id: int, payload: PackedByteArray) -> void:
+	var client_version := _parse_client_version(payload)
+	var accepted := client_version != "" and client_version == game_version
+
+	var rep := JSON.stringify(
+			{"accepted": accepted, "version": game_version}
+	).to_utf8_buffer()
+	var err := scene_multiplayer.send_auth(id, rep)
+
+	if err != OK:
+		push_error("Cannot answer peer %d: %s." % [id, error_string(err)])
+		return
+
+	if not accepted:
+		push_warning(
+				'Peer %d refused: version "%s", server version "%s".'
+						% [id, client_version, game_version]
+		)
+		return
+
+	print("Peer %d accepted with version %s." % [id, client_version])
+	scene_multiplayer.complete_auth(id)
+
+
+## Returns the version of a client message.
+func _parse_client_version(payload: PackedByteArray) -> String:
+	# Check every type before using the data.
+	var auth_data: Variant = JSON.parse_string(payload.get_string_from_utf8())
+
+	if auth_data is not Dictionary:
+		return ""
+
+	var fields: Dictionary = auth_data
+	var version: Variant = fields.get("version")
+
+	if version is not String:
+		return ""
+
+	return version
+
+
 ## Listen when a peer starts its authentication (both sides).
 ## The client sends its version; the server waits for it.
 func _on_peer_authenticating(id: int) -> void:
@@ -89,7 +131,9 @@ func _on_peer_authenticating(id: int) -> void:
 	var payload := JSON.stringify({"version": game_version}).to_utf8_buffer()
 	var err := scene_multiplayer.send_auth(id, payload)
 	if err != OK:
-		push_error("Cannot send the version to the server: %s." % error_string(err))
+		push_error(
+				"Cannot send the version to the server: %s." % error_string(err)
+		)
 		return
 
 	print("Version %s sent to the server." % game_version)

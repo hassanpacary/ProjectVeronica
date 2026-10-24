@@ -5,18 +5,15 @@ extends Control
 ## Shows which version of the game is running.
 ## In dev the version show is: dev.
 
-## Release informations file (absent in dev).
 const RELEASE_PATH := "res://release.cfg"
-
-## Version displayed when no release informations is available.
 const DEV_VERSION := "dev"
 
 #region ────────────────────────────────── USER ARGS ───────────────────────────────────
 
-## User argument that starts the server
+## User arg that starts the server
 const SERVER_OPTION := "--server"
 
-## User argument that joins the server
+## User arg that joins the server
 const JOIN_OPTION := "--join"
 
 #endregion
@@ -27,7 +24,7 @@ const JOIN_OPTION := "--join"
 @onready var network: Network = $Network
 
 
-## The engine call this function when all nodes of the game are ready.
+## Called when all nodes of the game are ready.
 func _ready() -> void:
 
 	# Display in the interface the game version.
@@ -39,7 +36,7 @@ func _ready() -> void:
 	# Start the server with user args.
 	network.game_version = version
 	_start_network_from_args()
-	
+
 
 #region ──────────────────────────────────── VERSION ───────────────────────────────────
 
