@@ -1,5 +1,5 @@
 <div style="text-align: center;">
-	<h1>Projet Veronica</h1>
+	<h1>Veronica Project</h1>
 </div>
 
 ## I. Introduction
@@ -11,7 +11,7 @@ A video game ?
 - Clone the project ;
 - Create godot alias command in powershell :
 	- `notepad $PROFILE` ;
-	- Save `Set-Alias godot "D:\Software\Godot\Godot_v4.7.2-stable_win64_console.exe"` in the $PROFILE ;
+	- Save `Set-Alias godot "D:\Software\Godot\Godot_v4.7.2-stable_win64_console.exe"` in $PROFILE ;
 	- execute `godot --headless --path . --import`
 	- Test with `godot --headless --path .`
 
@@ -69,7 +69,7 @@ Versions follow the `x.y.z` format. You can find the current version of the bot 
 - **refactor**.
 
 ## VI. Debug commands
-The engine option are set before `--` and mine before.
+The engine option are set before `--` and mine after.
 
 - `godot --version`: Godot version
 - `godot --path .`: Open game windows *(check terminal for logs)*

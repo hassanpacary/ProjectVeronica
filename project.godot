@@ -10,9 +10,12 @@ config_version=5
 
 [application]
 
-config/name="Projet Veronica"
+config/name="VeronicaProject"
 run/main_scene="uid://dljm5j0lyxupi"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="VeronicaProject"
 config/features=PackedStringArray("4.7", "Mobile")
+run/flush_stdout_on_print=true
 config/icon="res://icon.svg"
 
 [display]
