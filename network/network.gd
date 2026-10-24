@@ -1,7 +1,7 @@
 class_name Network
 extends Node
 
-## Network Node -
+## network - Network node
 ##
 ## Starts the ENet server or client and logs the connection events.
 
@@ -9,8 +9,9 @@ const PORT := 7000
 const DEFAULT_SERVER_IP := "127.0.0.1"
 const MAX_CONNECTIONS := 20
 
-## Version of the game sent to the server
 var game_version := ""
+## Authentication node of the open connection (ServerAuth or ClientAuth).
+var _auth: Node = null
 
 @onready var scene_multiplayer: SceneMultiplayer = multiplayer
 
@@ -25,16 +26,34 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(_on_connected_fail)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 
-	# A valid callback turns the authentication on.
-	# without it, peer_authenticating is never emitted and peers are accepted at once.
-	scene_multiplayer.auth_callback = _receive_auth_payload
-	scene_multiplayer.peer_authenticating.connect(_on_peer_authenticating)
 	scene_multiplayer.peer_authentication_failed.connect(
 			_on_peer_authentication_failed
 	)
 
 
-## Starts connecting to the server at address. OK only means the attempt has started.
+## Listen for clients on PORT.
+func start_server() -> Error:
+	var peer := ENetMultiplayerPeer.new()
+	var err := peer.create_server(PORT, MAX_CONNECTIONS)
+
+	if err:
+		push_error(
+				"Cannot start the server on port %d: %s." % [
+					PORT, error_string(err)
+				]
+		)
+		return err
+
+	var auth := ServerAuth.new()
+	auth.game_version = game_version
+	_start_auth(auth)
+
+	multiplayer.multiplayer_peer = peer
+	print("Server listening on port %d." % PORT)
+	return OK
+
+
+## Starts connecting to the server at address.
 func join_server(address: String=DEFAULT_SERVER_IP) -> Error:
 	var peer := ENetMultiplayerPeer.new()
 	var err := peer.create_client(address, PORT)
@@ -44,24 +63,12 @@ func join_server(address: String=DEFAULT_SERVER_IP) -> Error:
 		)
 		return err
 
+	var auth := ClientAuth.new()
+	auth.game_version = game_version
+	_start_auth(auth)
+
 	multiplayer.multiplayer_peer = peer
 	print("Connecting to %s:%d..." % [address, PORT])
-	return OK
-
-
-## Listen for clients on PORT. Returns OK, or the error if the port can't be used.
-func start_server() -> Error:
-	var peer := ENetMultiplayerPeer.new()
-	var err := peer.create_server(PORT, MAX_CONNECTIONS)
-
-	if err:
-		push_error(
-				"Cannot start the server on port %d: %s." % [PORT, error_string(err)]
-		)
-		return err
-
-	multiplayer.multiplayer_peer = peer
-	print("Server listening on port %d." % PORT)
 	return OK
 
 #endregion
@@ -69,74 +76,29 @@ func start_server() -> Error:
 
 #region ─────────────────────────────── AUTHENTICATION ─────────────────────────────────
 
+## Adds the authentication node of a new connection, in place of the previous one.
+func _start_auth(auth: Node) -> void:
+	_stop_auth()
+	_auth = auth
+	add_child(_auth)
+
+
+## Removes the authentication node of the closed connection.
+func _stop_auth() -> void:
+	if _auth == null:
+		return
+
+	_auth.queue_free()
+	_auth = null
+
+
 ## Called by SceneMultiplayer with the authentication payload sent by a peer.
-func _receive_auth_payload(id: int, payload: PackedByteArray) -> void:
+func _receive_auth_payload(payload: PackedByteArray) -> void:
 	if multiplayer.is_server():
-		_check_client_version(id, payload)
+		AuthProtocol.decode_client_payload(payload)
 		return
 
-	print("Answer from the server: %s" % payload.get_string_from_utf8())
-
-
-## Answers the client, then admits it only if both versions match.
-func _check_client_version(id: int, payload: PackedByteArray) -> void:
-	var client_version := _parse_client_version(payload)
-	var accepted := client_version != "" and client_version == game_version
-
-	var rep := JSON.stringify(
-			{"accepted": accepted, "version": game_version}
-	).to_utf8_buffer()
-	var err := scene_multiplayer.send_auth(id, rep)
-
-	if err != OK:
-		push_error("Cannot answer peer %d: %s." % [id, error_string(err)])
-		return
-
-	if not accepted:
-		push_warning(
-				'Peer %d refused: version "%s", server version "%s".'
-						% [id, client_version, game_version]
-		)
-		return
-
-	print("Peer %d accepted with version %s." % [id, client_version])
-	scene_multiplayer.complete_auth(id)
-
-
-## Returns the version of a client message.
-func _parse_client_version(payload: PackedByteArray) -> String:
-	# Check every type before using the data.
-	var auth_data: Variant = JSON.parse_string(payload.get_string_from_utf8())
-
-	if auth_data is not Dictionary:
-		return ""
-
-	var fields: Dictionary = auth_data
-	var version: Variant = fields.get("version")
-
-	if version is not String:
-		return ""
-
-	return version
-
-
-## Listen when a peer starts its authentication (both sides).
-## The client sends its version; the server waits for it.
-func _on_peer_authenticating(id: int) -> void:
-	if multiplayer.is_server():
-		print("Peer %d is authenticating." % id)
-		return
-
-	# On a client, the only peer is the server: id is always 1.
-	var payload := JSON.stringify({"version": game_version}).to_utf8_buffer()
-	var err := scene_multiplayer.send_auth(id, payload)
-	if err != OK:
-		push_error(
-				"Cannot send the version to the server: %s." % error_string(err)
-		)
-		return
-
-	print("Version %s sent to the server." % game_version)
+	AuthProtocol.decode_server_payload(payload)
 
 
 ## Listen when a peer leaves before the end of its authentication (both sides).
@@ -151,6 +113,7 @@ func _on_peer_authentication_failed(id: int) -> void:
 ## Remove/disconnect multiplayer peer object
 func remove_multiplayer_peer() -> void:
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	_stop_auth()
 
 
 ## Listen when player connected to the server (server side)
