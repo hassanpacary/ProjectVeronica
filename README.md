@@ -74,6 +74,7 @@ The engine option are set before `--` and mine after.
 - `godot --version`: Godot version
 - `godot --path .`: Open game windows *(check terminal for logs)*
 - `godot --headless --path .`: No windows, juste terminal logs
-- `godot --path . -- --my-option`: Open game with specific option
 - `godot --headless --path . --export-pack "Windows" build/jeu.pck`: Export game data only
 - `godot --main-pack build/jeu.pck`: Run the exported pack
+- `godot --headless --path . -- --server`: Start the server (UDP port 7000)
+- `godot --path . -- --join`: Open the game and join the server on this computer

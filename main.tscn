@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dljm5j0lyxupi"]
 
 [ext_resource type="Script" uid="uid://cyidlhc85f20x" path="res://main.gd" id="1_ig7tw"]
+[ext_resource type="Script" uid="uid://br5e60pse50ec" path="res://network.gd" id="2_0xm2m"]
 
 [node name="Main" type="Control" unique_id=1911060576]
 layout_mode = 3
@@ -25,3 +26,6 @@ offset_bottom = 11.5
 grow_horizontal = 2
 grow_vertical = 2
 text = "Version : ?"
+
+[node name="Network" type="Node" parent="." unique_id=361286781]
+script = ExtResource("2_0xm2m")
