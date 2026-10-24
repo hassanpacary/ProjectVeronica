@@ -31,11 +31,13 @@ const JOIN_OPTION := "--join"
 func _ready() -> void:
 
 	# Display in the interface the game version.
-	var version_text := "Version : %s" % _read_version()
+	var version := _read_version()
+	var version_text := "Version : %s" % version
 	version_label.text = version_text
 	print(version_text)
 
 	# Start the server with user args.
+	network.game_version = version
 	_start_network_from_args()
 	
 
